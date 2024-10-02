@@ -1,0 +1,29 @@
+h3 {
+    font-size: 40px;
+}
+
+.level1_comment {
+    margin-top: 30px;
+}
+
+.btn {
+    border: none;
+}
+
+.btn:hover {
+    color: rgb(13, 110, 253);
+}
+
+.publishComment {
+    margin-top: 25px;
+}
+
+.inputBox {
+    margin-left: 20px;
+}
+
+.userPhoto img {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+}

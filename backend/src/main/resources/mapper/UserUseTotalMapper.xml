@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.collect.backend.mapper.UserUseTotalMapper">
+
+    <resultMap id="BaseResultMap" type="com.collect.backend.domain.entity.UserUseTotal">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="userUse" column="user_use" jdbcType="BIGINT"/>
+            <result property="userTotal" column="user_total" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,user_id,user_use,
+        user_total
+    </sql>
+</mapper>

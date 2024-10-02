@@ -1,0 +1,78 @@
+.editShare,.deleteShare{
+    font-size: 16px;
+    text-align:center;
+    cursor: pointer;
+  }
+  .deleteShare{
+    margin-top: 10px;
+    color: #FF4D4F;
+  }
+  .deleteShare:hover{
+    background-color:  #FF4D4F;
+    color: white;
+  }
+  .editShare:hover{
+    background-color: #F5F5F5;
+  }
+  .tag{
+    background-color: white;
+    color: black;
+    cursor: pointer;
+  }
+  .tag:hover{
+    color: #40A9FF;
+  }
+  .box{
+    margin-top: 30px;
+  }
+  .container{
+    width: 1000px;
+  }
+  .chooseCard{
+    padding: 10px;
+  }
+  .contentBox{
+    margin-top: 20px;
+  }
+  .rightCount{
+    margin-left: 10px;
+  }
+  .mainBody{
+    overflow: hidden;
+  }
+  .content-card{
+    margin-top: 10px;
+    padding: 20px;
+  }
+  .buttonState,.dividerVertical{
+    margin-left: 30px;
+  }
+  .topUser{
+    display: flex;
+  }
+  .avatar img{
+    cursor: pointer;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+  }
+  .username{
+    margin-left: 15px;
+  }
+  .title{
+    color: black;
+    cursor: pointer;
+    margin-bottom: 15px;
+    margin-top: 15px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .contentFooter .updateTime{
+    color: rgba(0,0,0,.45);
+  }
+  .expandAll{
+    cursor: pointer;
+    color: #337ab7;
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
