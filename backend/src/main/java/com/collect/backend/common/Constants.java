@@ -76,4 +76,8 @@ public class Constants{
     public static String getUserUseFileKey(Long userId){
         return UPLOAD_FILE_COMPUTED_KEY + userId;
     }
+
+    public static String getDownloadKey(String code) {
+        return Constants.DOWNLOAD_KEY + code;
+    }
 }

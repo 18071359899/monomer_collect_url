@@ -9,6 +9,7 @@ import com.collect.backend.common.enums.MessageNotifyTypeEnum;
 import com.collect.backend.common.enums.UserShareBehaviorISAddType;
 import com.collect.backend.common.enums.UserShareBehaviorType;
 import com.collect.backend.common.event.MessageNotifyEvent;
+import com.collect.backend.common.exception.BusinessException;
 import com.collect.backend.common.exception.CommonErrorEnum;
 import com.collect.backend.dao.CommentDao;
 import com.collect.backend.dao.ShareDao;
@@ -20,6 +21,7 @@ import com.collect.backend.domain.vo.req.common.HomePageReq;
 import com.collect.backend.domain.vo.resp.ShareVo;
 import com.collect.backend.service.UserShareBehaviorService;
 import com.collect.backend.utils.ManageUserInfo;
+import com.collect.backend.utils.assertBussion.AssertUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -60,27 +62,23 @@ public class UserShareBehaviorServiceImpl implements UserShareBehaviorService {
 
     @Override
     public BaseResponse<Integer> shareBehaviorComment(ShareUserBehaviorReq shareUserBehaviorReq) {
-        if(Objects.isNull(shareUserBehaviorReq)){
-            return ResultUtils.error(CommonErrorEnum.PARAM_INVALID.getErrorCode(),"参数为空");
-        }
-        Comment comment = commentDao.getBaseMapper().selectById(shareUserBehaviorReq.getId());
+        AssertUtil.isNotEmpty(shareUserBehaviorReq,"参数为空");
+        Long commentId = shareUserBehaviorReq.getId();
+        Integer isAdd = shareUserBehaviorReq.getIsAdd();
+        Comment comment = commentDao.getBaseMapper().selectById(commentId);
+        if(Objects.isNull(comment)) throw new BusinessException("评论内容不存在");
         Long userId = ManageUserInfo.getUser().getId();
         Date date = new Date();
         UserShareBehavior userShareBehavior = new UserShareBehavior(null,userId,
-                UserShareBehaviorType.COMMENT_AGREE.getType(), date,shareUserBehaviorReq.getId()
+                UserShareBehaviorType.COMMENT_AGREE.getType(), date, commentId
         );
         MessageNotify messageNotify = new MessageNotify(null,comment.getUserId(),userId, MessageNotifyTypeEnum.USER_AGREE_COMMENT.getType(),comment.getId(),false,date);
-        if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
-            comment.setAgree(comment.getAgree() + USER_BEHAVIOR_TOTAL_VALUE);
-        }else if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
-            comment.setAgree(comment.getAgree() - USER_BEHAVIOR_TOTAL_VALUE);
-        }
-        int updateById = commentDao.getBaseMapper().updateById(comment);
-        if(updateById > 0){  //总量更新成功后再更新用户行为表
-            if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
+        Boolean updateById = commentDao.updateCommentAgree(commentId,isAdd);
+        if(updateById){  //总量更新成功后再更新用户行为表
+            if(isAdd == UserShareBehaviorISAddType.ADD_TYPE.getType()){
                 userShareBehaviorDao.getBaseMapper().insert(userShareBehavior);
                 applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,messageNotify));
-            }else if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
+            }else if(isAdd == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
                 userShareBehaviorDao.getBaseMapper().deleteById(
                         userShareBehaviorDao.queryByUserIdAndTypeAndCommentId(userId,
                                 UserShareBehaviorType.COMMENT_AGREE.getType(),comment.getId()));

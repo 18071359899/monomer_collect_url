@@ -16,6 +16,28 @@ import java.nio.charset.StandardCharsets;
 public class FileUtils
 {
     public static String FILENAME_PATTERN = "[a-zA-Z0-9_\\-\\|\\.\\u4e00-\\u9fa5]+";
+    /**
+     * 输出指定输入流的byte数组
+     */
+    public static void writeBytes(InputStream inputStream, OutputStream os) throws IOException {
+        try
+        {
+            byte[] b = new byte[1024];
+            int length;
+            while ((length = inputStream.read(b)) > 0)
+            {
+                os.write(b, 0, length);
+            }
+        } catch (IOException e)
+        {
+           throw e;
+        }
+        finally
+        {
+            os.close();
+            inputStream.close();
+        }
+    }
 
     /**
      * 输出指定文件的byte数组

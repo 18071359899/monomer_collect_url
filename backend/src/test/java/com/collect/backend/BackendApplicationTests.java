@@ -25,6 +25,7 @@ import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.json.JacksonJsonHandler;
 import com.meilisearch.sdk.model.SearchResult;
 import com.meilisearch.sdk.model.TaskInfo;
+import io.lettuce.core.ScriptOutputType;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
@@ -49,6 +50,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static com.collect.backend.common.Constants.*;
@@ -236,4 +238,36 @@ class BackendApplicationTests {
         System.out.println("到达");
     }
 
+
+    @Test
+    void testBF() {
+        ConcurrentHashMap<Long,Long> concurrentHashMap = new ConcurrentHashMap<>();
+        concurrentHashMap.put(1L,1L);
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (true){
+                        long l = concurrentHashMap.getOrDefault(1L, 0L) + 1L;
+                        concurrentHashMap.put(1L, l);
+                        System.out.println("put预期结果："+l); //750
+                    }
+                }
+            });
+        Thread thread2 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true){
+                    Iterator<Map.Entry<Long, Long>> iterator = concurrentHashMap.entrySet().iterator();
+                    while (iterator.hasNext()){
+                        Map.Entry<Long, Long> item = iterator.next();
+                        System.out.println("one 已经获取到数据  " + item.getValue());
+                        iterator.remove(); //749
+                        System.out.println("one 删除成功");
+                    }
+                }
+            }
+        });
+        thread2.start();
+        thread.start();
+    }
 }

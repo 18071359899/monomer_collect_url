@@ -6,6 +6,9 @@ import com.collect.backend.domain.entity.UserShareBehavior;
 import com.collect.backend.mapper.UserShareBehaviorMapper;
 import org.springframework.stereotype.Service;
 
+import static com.collect.backend.common.enums.UserShareBehaviorType.COMMENT_AGREE;
+import static com.collect.backend.common.enums.UserShareBehaviorType.SHARE_COLLECT;
+
 /**
 * @author Administrator
 * @description 针对表【user_share_behavior(用户对帖子的行为：点赞，收藏)】的数据库操作Service实现
@@ -27,7 +30,7 @@ public class UserShareBehaviorDao extends ServiceImpl<UserShareBehaviorMapper,Us
     public Integer queryIsCollectShare(Long userId,Long shareId){
         return  lambdaQuery().eq(UserShareBehavior::getUserId,userId)
                 .eq(UserShareBehavior::getRelationId,shareId)
-                .eq(UserShareBehavior::getType,UserShareBehaviorType.SHARE_COLLECT.getType()).list().size() > 0 ? 1 : 0;
+                .eq(UserShareBehavior::getType, SHARE_COLLECT.getType()).list().size() > 0 ? 1 : 0;
     }
     /**
      * 查询当前用户是否点赞了该评论
@@ -35,7 +38,7 @@ public class UserShareBehaviorDao extends ServiceImpl<UserShareBehaviorMapper,Us
     public Integer queryIsLikeComment(Long userId,Long commentId){
         return  lambdaQuery().eq(UserShareBehavior::getUserId,userId)
                 .eq(UserShareBehavior::getRelationId,commentId)
-                .eq(UserShareBehavior::getType,UserShareBehaviorType.COMMENT_AGREE.getType()).list().size() > 0 ? 1 : 0;
+                .eq(UserShareBehavior::getType, COMMENT_AGREE.getType()).list().size() > 0 ? 1 : 0;
     }
     /**
      * 通过用户id、类型和帖子id查询是否有该数据
@@ -54,6 +57,17 @@ public class UserShareBehaviorDao extends ServiceImpl<UserShareBehaviorMapper,Us
                 .eq(UserShareBehavior::getType,type)
                 .eq(UserShareBehavior::getRelationId,id).
                 one();
+    }
+
+    /**
+     * 查询某个文章的总收藏数
+     * @param shareId
+     * @return
+     */
+    public Integer queryCollectCntShare(Long shareId){
+        return  lambdaQuery().eq(UserShareBehavior::getRelationId,shareId)
+                .eq(UserShareBehavior::getType,SHARE_COLLECT)
+                .count();
     }
 }
 

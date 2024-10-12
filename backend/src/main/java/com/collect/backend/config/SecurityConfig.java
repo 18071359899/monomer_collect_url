@@ -44,7 +44,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter  {
                         "/user/account/acwing/acapp/recevice_code/",
                         "/user/account/acwing/web/apply_code/",
                         "/user/account/acwing/web/recevice_code/",
-                        "/captcha","/images/get/**","/file/download/**").permitAll()
+                        "/captcha","/images/get/**","/file/download/**","/minio/file/download/**").permitAll()
                 .antMatchers("/websocket/**").permitAll()
                 .antMatchers("/chat-websocket/**").permitAll()
                 .antMatchers("/pk/start/game/","/receive/bot/move/").hasIpAddress("127.0.0.1") //这个链接只允许这个IP访问

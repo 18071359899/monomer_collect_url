@@ -10,37 +10,33 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
- * 用户对帖子的行为：点赞，收藏
- * @TableName user_share_behavior
+ * 用户点赞计数表
+ * @TableName user_agree_share
  */
-@TableName(value ="user_share_behavior")
-@Data
+@TableName(value ="user_agree_share")
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
-public class UserShareBehavior implements Serializable {
+@Data
+public class UserAgreeShare implements Serializable {
     /**
      * 
      */
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private Long userAgreeShareId;
+
     /**
-     *  
+     * 文章id
      */
-    private Long userId;
+    private Long shareId;
+
     /**
-     * 行为类型：0，用户点赞   1，用户收藏，UserShareBehaviorType
+     * 点赞总数
      */
-    private Integer type;
-    /**
-     * 
-     */
-    private Date createTime;
-    /**
-     *  用户行为的关联表id，根据类型决定
-     */
-    private Long relationId;
+    private Long cnt;
+
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 }

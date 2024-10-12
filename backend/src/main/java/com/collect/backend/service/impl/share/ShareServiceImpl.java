@@ -1,5 +1,6 @@
 package com.collect.backend.service.impl.share;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
@@ -17,6 +18,7 @@ import com.collect.backend.dao.ShareDao;
 import com.collect.backend.dao.UserFollowDao;
 import com.collect.backend.dao.UserShareBehaviorDao;
 import com.collect.backend.domain.entity.*;
+import com.collect.backend.domain.entity.mq_event.LikeQueueEntity;
 import com.collect.backend.domain.vo.req.ShareUserBehaviorReq;
 import com.collect.backend.domain.vo.req.common.CursorPageBaseReq;
 import com.collect.backend.domain.vo.req.common.HomePageReq;
@@ -34,6 +36,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RedissonClient;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.ZSetOperations;
@@ -41,8 +44,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -67,13 +68,12 @@ public class ShareServiceImpl  implements ShareService {
     private ShareAdpter shareAdpter;
     @Autowired
     private ApplicationEventPublisher applicationEventPublisher;
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
     @Override
     public BaseResponse<Long> addShare(Share share) {
         Date date = new Date();
-        Share insertShare = new Share(
-                null, share.getTitle(), ManageUserInfo.getUser().getId(), share.getContent(), date, date
-                ,0,0,0,0
-        );
+        Share insertShare = new Share(null, share.getTitle(), ManageUserInfo.getUser().getId(), share.getContent(), date, date);
         int insert = shareDao.getBaseMapper().insert(insertShare);
         if(insert > 0){
             Long userId = ManageUserInfo.getUser().getId();
@@ -106,8 +106,7 @@ public class ShareServiceImpl  implements ShareService {
         }
         Date date = new Date();
         Share updateShare = new Share(
-                id, share.getTitle(), ManageUserInfo.getUser().getId(), share.getContent(), null, date,
-                share.getLike(),share.getComment(),share.getCollect(),share.getReading()
+                id, share.getTitle(), ManageUserInfo.getUser().getId(), share.getContent(), null, date
         );
         int update = shareDao.getBaseMapper().updateById(updateShare);
         if(update > 0){
@@ -164,56 +163,47 @@ public class ShareServiceImpl  implements ShareService {
     }
 
     @Override
-    public BaseResponse<Integer> userBehavior(ShareUserBehaviorReq shareUserBehaviorReq) {
-//        if(Objects.isNull(shareUserBehaviorReq)){
-//            return ResultUtils.error(CommonErrorEnum.PARAM_INVALID.getErrorCode(),"参数为空");
-//        }
-//        Share share = shareDao.getBaseMapper().selectById(shareUserBehaviorReq.getId());
-//        Long userId = ManageUserInfo.getUser().getId();
-//        UserShareBehavior userShareBehavior = new UserShareBehavior(null,userId,
-//                UserShareBehaviorType.SHARE_AGREE.getType(),new Date(),shareUserBehaviorReq.getId()
-//                );
-//        Integer type = shareUserBehaviorReq.getType();
-//        UserShareBehaviorType byType = UserShareBehaviorType.getByType(type);
-//        MessageNotify messageNotify = new MessageNotify(null,share.getUserId(),userId,null,share.getId(),false,new Date());
-//        switch (byType) {
-//            case SHARE_AGREE:
-//                if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
-//                    share.setLike(share.getLike() + USER_BEHAVIOR_TOTAL_VALUE);
-//                }else if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
-//                    share.setLike(share.getLike() - USER_BEHAVIOR_TOTAL_VALUE);
-//                }
-//                messageNotify.setType(MessageNotifyTypeEnum.USER_AGREE_ARTICLE.getType());
-//                break;
-//            case SHARE_COLLECT:
-//                if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
-//                    userShareBehavior.setType(UserShareBehaviorType.SHARE_COLLECT.getType());
-//                    share.setCollect(share.getCollect() + USER_BEHAVIOR_TOTAL_VALUE);
-//                }else if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
-//                    share.setCollect(share.getCollect() - USER_BEHAVIOR_TOTAL_VALUE);
-//                }
-//                messageNotify.setType(MessageNotifyTypeEnum.USER_COLLECT_ARTICLE.getType());
-//                break;
-//        }
-//        int updateById = shareDao.getBaseMapper().updateById(share);
-        LocalDateTime localDateTime = LocalDateTime.now();
-        System.out.println("当前时间 "+localDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-        shareDao.updateShareLike(shareUserBehaviorReq.getId());
-//        if(updateById > 0){
-//            if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
-//                shareBehaviorDao.getBaseMapper().insert(userShareBehavior);
-//                applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,messageNotify));
-//            }else if(shareUserBehaviorReq.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
-//                shareBehaviorDao.getBaseMapper().deleteById(
-//                        shareBehaviorDao.queryByUserIdAndTypeAndShareId(userId, shareUserBehaviorReq.getType(),share.getId()));
-//            }
-//        }
-//        Integer resltCount = share.getLike();
-//        if(type == UserShareBehaviorType.SHARE_COLLECT.getType()){
-//            resltCount = share.getCollect();
-//        }
-        return  ResultUtils.success(1);
-//        return  ResultUtils.success(resltCount);
+    public BaseResponse<String> userBehavior(ShareUserBehaviorReq shareUserBehaviorReq) {
+        AssertUtil.isNotEmpty(shareUserBehaviorReq,"参数为空");
+        Long userId = ManageUserInfo.getUser().getId();
+        UserShareBehavior userShareBehavior = new UserShareBehavior(null,userId,
+                UserShareBehaviorType.SHARE_AGREE.getType(),new Date(),shareUserBehaviorReq.getId()
+                );
+        Integer type = shareUserBehaviorReq.getType();
+        UserShareBehaviorType byType = UserShareBehaviorType.getByType(type);
+        MessageNotify messageNotify  = null;
+        Integer isAdd = shareUserBehaviorReq.getIsAdd();
+        switch (byType) {
+            case SHARE_AGREE:
+                LikeQueueEntity likeQueueEntity = new LikeQueueEntity();
+                BeanUtil.copyProperties(userShareBehavior,likeQueueEntity);
+                likeQueueEntity.setIsAdd(isAdd);
+                rabbitTemplate.convertAndSend("collect.like.direct","lcwyyds",likeQueueEntity);
+                break;
+                //收藏不走消息队列
+            case SHARE_COLLECT:
+                Share share = shareDao.getBaseMapper().selectById(shareUserBehaviorReq.getId());
+                if(Objects.isNull(share)) throw new BusinessException("文章内容不存在");
+                messageNotify = new MessageNotify(null,
+                        share.getUserId(),userId,null,share.getId(), false,new Date());
+
+                if(isAdd == UserShareBehaviorISAddType.ADD_TYPE.getType()){
+                    userShareBehavior.setType(UserShareBehaviorType.SHARE_COLLECT.getType());
+                    shareBehaviorDao.getBaseMapper().insert(userShareBehavior);
+                }else if(isAdd == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
+                    shareBehaviorDao.getBaseMapper().deleteById(
+                            shareBehaviorDao.queryByUserIdAndTypeAndShareId(userId, shareUserBehaviorReq.getType(),share.getId()));
+                }
+                messageNotify.setType(MessageNotifyTypeEnum.USER_COLLECT_ARTICLE.getType());
+                break;
+        }
+
+        if(isAdd == UserShareBehaviorISAddType.ADD_TYPE.getType()
+        && shareUserBehaviorReq.getType() == UserShareBehaviorType.SHARE_COLLECT.getType()){  //用户收藏帖子走内置event事件
+            applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,messageNotify));
+        }
+
+        return  ResultUtils.success("ok");
     }
 
     @Override
@@ -276,6 +266,13 @@ public class ShareServiceImpl  implements ShareService {
     @Override
     public ShareVo getDetailShare(Long id) {
         AssertUtil.isNotEmpty(id,"编号不能为空");
+        Long userId = ManageUserInfo.getUser().getId();
+        //更新阅读量
+        String readingKey = RedisUtils.getStr(shareReadingKey + id + ":userId:" + userId);
+        if(StringUtils.isBlank(readingKey)){
+            shareAdpter.getReadCountDao().updateReadCount(id);
+            RedisUtils.set(shareReadingKey + id + ":userId:" + userId,1,READING_EXPIRIION, TimeUnit.DAYS);
+        }
         return RedisCommonFunc.addCacheCommonFunForBloom
                 (redissonClient, getShareDetailsKey(id), getDetailsLockKey(id), ShareVo.class
                 , new Supplier<ShareVo>() {
@@ -288,14 +285,6 @@ public class ShareServiceImpl  implements ShareService {
 //                            stringRedisTemplate.opsForValue().set(getShareDetailsKey(id),"", ARTICLE_NULL_TIME,TimeUnit.MINUTES);
                             throw new BusinessException("分享页面不存在");
                         }
-                        //更新阅读量
-                        String readingKey = RedisUtils.getStr(shareReadingKey + share.getId() + ":userId:" + share.getUserId());
-                        if(StringUtils.isBlank(readingKey)){
-                            share.setReading(share.getReading() + 1);
-                            shareDao.getBaseMapper().updateById(share);
-                            RedisUtils.set(shareReadingKey + share.getId() + ":userId:" + share.getUserId(),1,READING_EXPIRIION, TimeUnit.DAYS);
-                        }
-                        Long userId = ManageUserInfo.getUser().getId();
                         ShareVo shareVo = shareAdpter.getShareVo(share, userId);
                         RedisUtils.set(getShareDetailsKey(id),shareVo,getRandomTimeMin(DETAILS_SHARE_TIME),TimeUnit.MINUTES);  //设置缓存
                         return shareVo;

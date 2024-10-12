@@ -9,11 +9,12 @@ import com.collect.backend.dao.UploadFileDao;
 import com.collect.backend.dao.UserUseTotalDao;
 import com.collect.backend.domain.entity.UploadFile;
 import com.collect.backend.domain.entity.UserUseTotal;
-import com.collect.backend.domain.vo.cache.UserSpaceRedisVo;
 import com.collect.backend.domain.vo.req.UnionFileReq;
+import com.collect.backend.domain.vo.req.upload_file.AddMinioUploadFileReq;
 import com.collect.backend.domain.vo.resp.UploadFileInfoResp;
 import com.collect.backend.utils.ManageUserInfo;
 import com.collect.backend.utils.assertBussion.AssertUtil;
+import com.collect.backend.utils.file.FileUtils;
 import com.collect.backend.utils.fileType.MimeTypeUtils;
 import com.collect.backend.utils.minio.MinioUtils;
 import com.collect.backend.utils.redis.RedisUtils;
@@ -22,16 +23,18 @@ import io.minio.ObjectArgs;
 import io.minio.messages.DeleteObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
+import javax.servlet.http.HttpServletResponse;
+import java.io.InputStream;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.collect.backend.common.Constants.*;
+
 
 @Service
 @Slf4j
@@ -79,7 +82,7 @@ public class MinioUploadFileServiceImpl {
             log.error("计算出错");
         }
        //更新redis使用空间信息
-        System.out.println("更新前的值 "+ RedisUtils.hget(getUserUseFileKey(userId), UPLOAD_FILE_USE_KEY));
+        System.out.println("更新前的值 "+ RedisUtils.hget(getUserUseFileKey(userId), UPLOAD_FILE_USE_KEY)); //todo 记录返回的值并非最终更新的值
         RedisUtils.hincr(getUserUseFileKey(userId), UPLOAD_FILE_USE_KEY, fileSize);
         System.out.println("更新后的值 "+ RedisUtils.hget(getUserUseFileKey(userId), UPLOAD_FILE_USE_KEY));
         RedisUtils.hset(getUserUseFileKey(userId),recordChunkInfo(fileMd5,chunkIndex),"1");
@@ -178,11 +181,59 @@ public class MinioUploadFileServiceImpl {
                 deleteObjects.add(new DeleteObject(path));
             } catch (Exception ignored) {
             }
-
         }
         minioUtils.removeFiles(bucketName,deleteObjects);
         // 更新用户使用空间
         userUseTotalDao.updateUserUploadFileSpace(reduceUserSpace,1);
         return ResultUtils.success("ok");
+    }
+
+    public void downloadFile(String path, HttpServletResponse response, String code) {
+        String downloadKey = getDownloadKey(code);
+        Boolean isExist = RedisUtils.get(downloadKey, Boolean.class);
+        AssertUtil.isNotEmpty(isExist,"你无权下载该文件");
+        RedisUtils.del(downloadKey);
+        try
+        {
+            String bucketName = minioProperties.getBucketName();
+            InputStream minioUtilsInputStream = minioUtils.getObject(bucketName, path);
+            response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+            FileUtils.setAttachmentResponseHeader(response, path);
+            FileUtils.writeBytes(minioUtilsInputStream, response.getOutputStream());
+        }
+        catch (Exception e)
+        {
+            log.error("下载文件失败", e);
+        }
+    }
+
+    public BaseResponse<Long> addUploadFile(AddMinioUploadFileReq addUploadFileReq) {
+        Date date = new Date();
+        String fileMd5 = addUploadFileReq.getMd5();
+        String fileName = addUploadFileReq.getFileName();
+        Long fileSize = addUploadFileReq.getFileSize();
+        String suffixNoPoint = MimeTypeUtils.getSuffixNoPoint(fileName);
+        //合并成功，记录数据库
+        UploadFile newUploadFileData = new UploadFile(
+                null,fileMd5,date,fileMd5 + MimeTypeUtils.getSuffix(fileName),fileName, MimeTypeUtils.getFileTypeByFileSuffix(suffixNoPoint).getType(),
+                addUploadFileReq.getPid(),null, ManageUserInfo.getUser().getId(),date,0 //通过ffmepeg生成缩略图
+        );
+        int insert = uploadFileDao.getBaseMapper().insert(newUploadFileData);
+        AssertUtil.isTrue(insert > 0,"新增失败");
+
+
+
+        //更新用户使用文件空间
+        userUseTotalDao.updateUserUploadFileSpace(fileSize,0);
+        Long id = newUploadFileData.getId();
+//        Map<String,Object> map = new HashMap<>();
+//        map.put("monthDay",monthDay);
+//        map.put("realFileName",realFileName);
+//        map.put("targetFileName",targetFileName);
+//        map.put("fileName",fileName);
+//        map.put("id",id.toString());
+//
+//        rabbitTemplate.convertAndSend("work.queue",map);
+        return ResultUtils.success(id);
     }
 }

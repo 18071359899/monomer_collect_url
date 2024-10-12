@@ -13,34 +13,40 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 用户对帖子的行为：点赞，收藏
- * @TableName user_share_behavior
+ * 计数表
+ * @TableName read_count
  */
-@TableName(value ="user_share_behavior")
-@Data
-@NoArgsConstructor
+@TableName(value ="read_count")
 @AllArgsConstructor
+@NoArgsConstructor
+@Data
 @ToString
-public class UserShareBehavior implements Serializable {
+public class ReadCount implements Serializable {
     /**
-     * 
+     * 主键ID
      */
     @TableId(type = IdType.AUTO)
     private Long id;
     /**
-     *  
+     * 文档ID（文章）
      */
-    private Long userId;
+    private Long documentId;
+
     /**
-     * 行为类型：0，用户点赞   1，用户收藏，UserShareBehaviorType
+     * 访问计数
      */
-    private Integer type;
+    private Integer cnt;
+
     /**
-     * 
+     * 创建时间
      */
     private Date createTime;
+
     /**
-     *  用户行为的关联表id，根据类型决定
+     * 最后更新时间
      */
-    private Long relationId;
+    private Date updateTime;
+
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 }

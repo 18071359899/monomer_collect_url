@@ -19,10 +19,11 @@ import com.meilisearch.sdk.SearchRequest;
 import com.meilisearch.sdk.model.SearchResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+
+import static com.collect.backend.utils.date_string_convert.DateStringMutualConvertUtils.StrToDate;
 
 
 @Service
@@ -73,16 +74,23 @@ public class SearchServiceImpl implements SearchService {
         return ResultUtils.error(ErrorCode.FORBIDDEN_ERROR);
     }
 
+    public String getFormatStr(){
+        return "yyyy-MM-dd HH:mm";
+    }
     private List<ShareVo> getShareVoList(ArrayList<HashMap<String, Object>> hits) {
         List<ShareVo> shareVOList = new ArrayList<>();
         Long userId = ManageUserInfo.getUser().getId();
         hits.forEach(hit->{
-            //todo 解决 system exception! The reason is :can not cast to Date, value : 2024-08-24 21:48
+            String createTIme = (String) hit.get("createTime");
+            hit.put("createTime",StrToDate(createTIme,getFormatStr()));
+            String updateTime = (String) hit.get("updateTime");
+            hit.put("updateTime",StrToDate(updateTime,getFormatStr()));
             ShareVo shareVo = JSONObject.toJavaObject(new JSONObject(hit), ShareVo.class);
             shareVOList.add(shareAdpter.getShareVo(shareVo,userId));
         });
         return shareVOList;
     }
+
     private List<UserVo> getUserVoList(ArrayList<HashMap<String, Object>> hits) {
             List<UserVo> userVos = new ArrayList<>();
             Long userId = ManageUserInfo.getUser().getId();

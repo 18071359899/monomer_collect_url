@@ -49,8 +49,7 @@ public class CommentServiceImpl implements CommentService {
         int insert = commentDao.getBaseMapper().insert(comment);
         if(insert > 0){
             Share share = shareDao.getBaseMapper().selectById(comment.getShareId());
-            share.setComment(share.getComment()+1);
-            shareDao.getBaseMapper().updateById(share);
+            //进行消息通知
             if(!comment.getFatherId().equals(0L))  //不是一级评论
             applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,new MessageNotify(
                     null,comment.getToUserId(),comment.getUserId(), MessageNotifyTypeEnum.USER_REPLY_COMMENT.getType(),comment.getId(),false,new Date())
@@ -88,9 +87,6 @@ public class CommentServiceImpl implements CommentService {
                 }
             }
         }
-        Share share = shareDao.getBaseMapper().selectById(comment.getShareId());
-        share.setComment(share.getComment() - deleteCommentCount);
-        shareDao.getBaseMapper().updateById(share);
     }
 
     @Override

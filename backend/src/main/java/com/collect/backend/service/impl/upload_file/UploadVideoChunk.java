@@ -23,28 +23,28 @@ public class UploadVideoChunk {
      * @throws InterruptedException
      */
     public  String generateVideoThumbnail(String inputVideoPath, String outputImagePath, int width, int height) throws IOException, InterruptedException {
-            // FFmpeg命令，用于从视频中提取第一帧作为缩略图，并指定尺寸
-            String command = String.format("ffmpeg -i %s -vf \"thumbnail\" -frames:v 1 -c:v mjpeg -vf \"scale=%d:%d\" %s", inputVideoPath, width, height, outputImagePath);
+        // FFmpeg命令，用于从视频中提取第一帧作为缩略图，并指定尺寸
+        String command = String.format("ffmpeg -i %s -vf \"thumbnail\" -frames:v 1 -c:v mjpeg -vf \"scale=%d:%d\" %s", inputVideoPath, width, height, outputImagePath);
 
-            // 使用ProcessBuilder执行FFmpeg命令
-            ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
+        // 使用ProcessBuilder执行FFmpeg命令
+        ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+        processBuilder.redirectErrorStream(true);
+        Process process = processBuilder.start();
 
-            // 读取命令执行过程中的输出信息
-//            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-//            String line;
-//            while ((line = reader.readLine()) != null) {
-//                System.out.println(line);
-//            }
-
-            // 等待命令执行完成
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                return "fail";
-            }
-            return null;
+        // 读取命令执行过程中的输出信息
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            System.out.println(line);
         }
+
+        // 等待命令执行完成
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            return "fail";
+        }
+        return null;
+    }
 
     /**
      *
@@ -56,27 +56,27 @@ public class UploadVideoChunk {
      * @throws InterruptedException
      */
     public  String generateImageThumbnail(String inputImagePath, String outputImagePath, int width, int height) throws IOException, InterruptedException {
-            // FFmpeg命令，用于将图片转换为缩略图，并指定尺寸
-            String command = String.format("ffmpeg -i %s -vf \"thumbnail\" -frames:v 1 -c:v mjpeg -vf \"scale=%d:%d\" %s", inputImagePath, width, height, outputImagePath);
+        // FFmpeg命令，用于将图片转换为缩略图，并指定尺寸
+        String command = String.format("ffmpeg -i %s -vf \"thumbnail\" -frames:v 1 -c:v mjpeg -vf \"scale=%d:%d\" %s", inputImagePath, width, height, outputImagePath);
 
-            // 使用ProcessBuilder执行FFmpeg命令
-            ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
+        // 使用ProcessBuilder执行FFmpeg命令
+        ProcessBuilder processBuilder = new ProcessBuilder(command.split(" "));
+        processBuilder.redirectErrorStream(true);
+        Process process = processBuilder.start();
 
-//            // 读取命令执行过程中的输出信息
-//            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-//            String line;
-//            while ((line = reader.readLine()) != null) {
-//                System.out.println(line);
-//            }
+        // 读取命令执行过程中的输出信息
+        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            System.out.println(line);
+        }
 
-            // 等待命令执行完成
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {  //失败
-                return "fail";
-            }
-            return null;
+        // 等待命令执行完成
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {  //失败
+            return "fail";
+        }
+        return null;
     }
 
     public static void main(String[] args) {

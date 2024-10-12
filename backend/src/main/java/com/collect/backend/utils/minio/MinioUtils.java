@@ -6,12 +6,14 @@ import io.minio.*;
 import io.minio.http.Method;
 import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
+import io.minio.messages.Item;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.util.List;
 
 @Slf4j
@@ -229,5 +231,77 @@ public class MinioUtils {
         }
     }
 
+
+    /**
+     * 判断文件夹是否存在
+     *
+     * @param bucketName 存储桶
+     * @param objectName 文件夹名称
+     * @return
+     */
+    public boolean isFolderExist(String bucketName, String objectName) {
+        boolean exist = false;
+        try {
+            Iterable<Result<Item>> results = minioClient.listObjects(
+                    ListObjectsArgs.builder().bucket(bucketName).prefix(objectName).recursive(false).build());
+            for (Result<Item> result : results) {
+                Item item = result.get();
+                if (item.isDir() && objectName.equals(item.objectName())) {
+                    exist = true;
+                }
+            }
+        } catch (Exception e) {
+            exist = false;
+        }
+        return exist;
+    }
+
+    /**
+     * 获取文件流
+     *
+     * @param bucketName 存储桶
+     * @param objectName 文件名
+     * @return 二进制流
+     */
+    public InputStream getObject(String bucketName, String objectName) throws Exception {
+        return minioClient.getObject(GetObjectArgs.builder().bucket(bucketName).object(objectName).build());
+    }
+
+    /**
+     * 断点下载
+     *
+     * @param bucketName 存储桶
+     * @param objectName 文件名称
+     * @param offset     起始字节的位置
+     * @param length     要读取的长度
+     * @return 二进制流
+     */
+    public InputStream getObject(String bucketName, String objectName, long offset, long length) throws Exception {
+        return minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .offset(offset)
+                        .length(length)
+                        .build());
+    }
+
+    /**
+     * 获取路径下文件列表
+     *
+     * @param bucketName 存储桶
+     * @param prefix     文件名称
+     * @param recursive  是否递归查找，false：模拟文件夹结构查找
+     * @return 二进制流
+     */
+    public Iterable<Result<Item>> listObjects(String bucketName, String prefix,
+                                              boolean recursive) {
+        return minioClient.listObjects(
+                ListObjectsArgs.builder()
+                        .bucket(bucketName)
+                        .prefix(prefix)
+                        .recursive(recursive)
+                        .build());
+    }
 
 }

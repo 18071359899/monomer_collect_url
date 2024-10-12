@@ -20,7 +20,7 @@ public interface ShareService {
 
     BaseResponse<Share> getShare(Long id);
 
-    BaseResponse<Integer> userBehavior(ShareUserBehaviorReq share);
+    BaseResponse<String> userBehavior(ShareUserBehaviorReq share);
 
     BaseResponse<Page<ShareVo>> getInfoShare(HomePageReq homePageReq);
 

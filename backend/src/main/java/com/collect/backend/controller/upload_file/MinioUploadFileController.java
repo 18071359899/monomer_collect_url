@@ -5,6 +5,7 @@ import com.collect.backend.config.minio.MinioProperties;
 import com.collect.backend.domain.entity.UploadFile;
 import com.collect.backend.domain.vo.req.DeleteListByIds;
 import com.collect.backend.domain.vo.req.UnionFileReq;
+import com.collect.backend.domain.vo.req.upload_file.AddMinioUploadFileReq;
 import com.collect.backend.domain.vo.req.upload_file.AddUploadFileReq;
 import com.collect.backend.domain.vo.resp.UploadFileInfoResp;
 import com.collect.backend.domain.vo.resp.upload_file.UnionFileResp;
@@ -88,8 +89,9 @@ public class MinioUploadFileController {
      * 新增上传文件接口
      */
     @PostMapping("/add/uploadFile")
-    public BaseResponse<Long> addUploadFile(@RequestBody @Valid AddUploadFileReq addUploadFileReq){ //todo 改变参数
-        return uploadFileService.addUploadFile(addUploadFileReq);
+    public BaseResponse<Long> addUploadFile(@RequestBody @Valid AddMinioUploadFileReq addUploadFileReq){ //todo 改变参数
+        //todo  改造流媒体分片并使用minio存储
+        return minioUploadFileService.addUploadFile(addUploadFileReq);
     }
 
     /**
@@ -118,22 +120,22 @@ public class MinioUploadFileController {
     public BaseResponse<String> selectCurrUserIsSpace(Long fileSize){
         return uploadFileService.selectCurrUserIsSpace(fileSize);
     }
-//    /**
-//     * 获取下载链接code
-//     */
-//    @GetMapping("/get/download/code")
-//    public BaseResponse<String> getDownloadCode(){
-//        return minioUploadFileService.getDownloadCode();
-//    }
-//    /**
-//     * 下载
-//     */
-//    @GetMapping("/download/{code}/**")
-//    public void downloadFile(HttpServletRequest httpServletRequest, HttpServletResponse response
-//    ,@PathVariable("code") String code){
-//        String path = HttpRequestParamsUtils.getPathAllParams(httpServletRequest);
-//        minioUploadFileService.downloadFile(path,response,code);
-//    }
+    /**
+     * 获取下载链接code
+     */
+    @GetMapping("/get/download/code")
+    public BaseResponse<String> getDownloadCode(){
+        return uploadFileService.getDownloadCode();
+    }
+    /**
+     * 下载
+     */
+    @GetMapping("/download/{code}/**")
+    public void downloadFile(HttpServletRequest httpServletRequest, HttpServletResponse response
+    ,@PathVariable("code") String code){
+        String path = HttpRequestParamsUtils.getPathAllParams(httpServletRequest);
+        minioUploadFileService.downloadFile(path,response,code);
+    }
     //todo 是否需要增加一个接口将上传时暂停或删除对应临时目录删除的对应接口
     /**
      *

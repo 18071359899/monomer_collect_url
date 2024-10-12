@@ -47,6 +47,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static com.collect.backend.common.Constants.getDownloadKey;
+
 
 @Service
 @Slf4j
@@ -203,7 +205,6 @@ public class UploadFileServiceImpl {
         map.put("fileName",fileName);
         map.put("id",id.toString());
 
-        //todo 改造流媒体分片并使用minio存储
         rabbitTemplate.convertAndSend("work.queue",map);
         return ResultUtils.success(id);
     }
@@ -348,9 +349,6 @@ public class UploadFileServiceImpl {
             uploadFile.setIsDelete(LogicDeleteTypeEnum.NO_DELETE.getType());
             uploadFileDao.getBaseMapper().insert(uploadFile);
         });
-    }
-    public String getDownloadKey(String code) {
-        return Constants.DOWNLOAD_KEY + code;
     }
     public BaseResponse<String> getDownloadCode() {
         String randomString = RandomUtil.randomString(10);

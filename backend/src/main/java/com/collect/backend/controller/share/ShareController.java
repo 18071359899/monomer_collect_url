@@ -41,7 +41,7 @@ public class ShareController {
      * 用户点赞、收藏、取消点赞、取消收藏了某个帖子
      */
     @PostMapping("/userBehavior/")
-    public BaseResponse<Integer> updateUserBehavior(@Valid @RequestBody ShareUserBehaviorReq share){
+    public BaseResponse<String> updateUserBehavior(@Valid @RequestBody ShareUserBehaviorReq share){
         return shareService.userBehavior(share);
     }
     @GetMapping("/list/")

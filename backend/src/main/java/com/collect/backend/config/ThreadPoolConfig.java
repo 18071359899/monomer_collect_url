@@ -17,7 +17,7 @@ public class ThreadPoolConfig
     private int corePoolSize = 30;
 
     // 最大可创建的线程数
-    private int maxPoolSize = 50;
+    private int maxPoolSize = 200;
 
     // 队列最大长度
     private int queueCapacity = 1000;

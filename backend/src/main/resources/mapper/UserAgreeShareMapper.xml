@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.collect.backend.mapper.UserAgreeShareMapper">
+
+    <resultMap id="BaseResultMap" type="com.collect.backend.domain.entity.UserAgreeShare">
+            <id property="userAgreeShareId" column="user_agree_share_id" jdbcType="BIGINT"/>
+            <result property="shareId" column="share_id" jdbcType="BIGINT"/>
+            <result property="cnt" column="cnt" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        user_agree_share_id,share_id,cnt
+    </sql>
+</mapper>

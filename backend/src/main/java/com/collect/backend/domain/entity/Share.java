@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.validator.constraints.Length;
 
 import javax.validation.constraints.NotBlank;
@@ -16,6 +17,7 @@ import java.util.Date;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString
 public class Share{
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -29,11 +31,4 @@ public class Share{
     private Date createTime;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm",timezone = "Asia/Shanghai")
     private Date updateTime;
-    @TableField("`like`")
-    private Integer like;    //点赞数
-    @TableField("`comment`")
-    private Integer comment;  //评论数
-    @TableField("`collect`")
-    private Integer collect;  //收藏数
-    private Integer reading; //阅读量
 }

@@ -26,10 +26,4 @@ public class ShareDao extends ServiceImpl<ShareMapper, Share> {
         return CursorUtils.getCursorPageByMysql(this, cursorPageBaseReq,
                 wrapper -> wrapper.orderByDesc(Share::getId), Share::getId);
     }
-
-    public void updateShareLike(Long id) {
-        lambdaUpdate().eq(Share::getId,id)
-                .setSql("`like`=`like`+1")
-                .update();
-    }
 }
