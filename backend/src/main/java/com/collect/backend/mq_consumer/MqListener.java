@@ -1,5 +1,7 @@
 package com.collect.backend.mq_consumer;
 
+import cn.hutool.core.util.BooleanUtil;
+import com.collect.backend.common.Constants;
 import com.collect.backend.common.enums.FileTypeEnum;
 import com.collect.backend.common.enums.MessageNotifyTypeEnum;
 import com.collect.backend.common.enums.UserShareBehaviorISAddType;
@@ -8,8 +10,10 @@ import com.collect.backend.domain.entity.MessageNotify;
 import com.collect.backend.domain.entity.Share;
 import com.collect.backend.domain.entity.UploadFile;
 import com.collect.backend.domain.entity.mq_event.LikeQueueEntity;
+import com.collect.backend.domain.entity.mq_event.LikeRecordEntity;
 import com.collect.backend.service.impl.upload_file.UploadVideoChunk;
 import com.collect.backend.utils.fileType.MimeTypeUtils;
+import com.collect.backend.utils.redis.RedisUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static com.collect.backend.service.impl.upload_file.UploadFileServiceImpl.HEIGHT;
 import static com.collect.backend.service.impl.upload_file.UploadFileServiceImpl.WIDTH;
@@ -46,11 +51,9 @@ public class MqListener {
     @Autowired
     private UserAgreeShareDao userAgreeShareDao;
     /**
-     * 内存中聚合用户点赞总数： 文章id对应文章要增加的次数，负数为减少
+     * 内存中聚合用户点赞总数
      */
-
-    private static ConcurrentHashMap<Long,Long> recordUserLikeCounts = new ConcurrentHashMap<>();
-    private static ConcurrentHashMap<Long,Long> recordUserLikeCounts2 = new ConcurrentHashMap<>();
+    private static ConcurrentLinkedQueue<LikeRecordEntity> recordLikeAllInfoCount = new ConcurrentLinkedQueue<>();
     /**
      * 处理视频、图片相关的内容
      * @param msg
@@ -124,89 +127,62 @@ public class MqListener {
         Share share = shareDao.getBaseMapper().selectById(likeQueueEntity.getRelationId());
         if(Objects.isNull(share)) return;
         Long shareId = share.getId();
-        Long likeCountsOrDefault = 0L;
+        Integer behaviorType = likeQueueEntity.getIsAdd();
         //记录用户对于点赞的行为
-        if(likeQueueEntity.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
+        if(behaviorType == UserShareBehaviorISAddType.ADD_TYPE.getType()){
             shareBehaviorDao.getBaseMapper().insert(likeQueueEntity);
-            likeCountsOrDefault = 1L;
-        }else if(likeQueueEntity.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
+        }else if(behaviorType == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
             shareBehaviorDao.getBaseMapper().deleteById(
                     shareBehaviorDao.queryByUserIdAndTypeAndShareId(userId, likeQueueEntity.getType(), shareId));
-            likeCountsOrDefault = -1L;
         }
-        Long count = recordUserLikeCounts.getOrDefault(shareId, 0L) + likeCountsOrDefault; //2. 同时获取到数据
-        System.out.println("更新的值 "+count);
-        //在内存中记录要增加的点赞数
-        recordUserLikeCounts.put(shareId,count);
+        //在内存中记录点赞信息
+        recordLikeAllInfoCount.offer(new LikeRecordEntity(shareId, behaviorType ==
+                UserShareBehaviorISAddType.ADD_TYPE.getType()));
 
         //消息通知到点赞对应的文章用户
         setMessageNotify(share,userId);
     }
-    public void handleLike2(LikeQueueEntity likeQueueEntity){
-        Long userId = likeQueueEntity.getUserId();
-        Share share = shareDao.getBaseMapper().selectById(likeQueueEntity.getRelationId());
-        if(Objects.isNull(share)) return;
-        Long shareId = share.getId();
-        Long likeCountsOrDefault = 0L;
-        //记录用户对于点赞的行为
-        if(likeQueueEntity.getIsAdd() == UserShareBehaviorISAddType.ADD_TYPE.getType()){
-            shareBehaviorDao.getBaseMapper().insert(likeQueueEntity);
-            likeCountsOrDefault = 1L;
-        }else if(likeQueueEntity.getIsAdd() == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
-            shareBehaviorDao.getBaseMapper().deleteById(
-                    shareBehaviorDao.queryByUserIdAndTypeAndShareId(userId, likeQueueEntity.getType(), shareId));
-            likeCountsOrDefault = -1L;
-        }
-        //在内存中记录要增加的点赞数
-        recordUserLikeCounts2.put(shareId,recordUserLikeCounts2.getOrDefault(shareId, 0L) +
-                likeCountsOrDefault);
 
-        //消息通知到点赞对应的文章用户
-        setMessageNotify(share,userId);
-    }
     @RabbitListener(queues = "direct.likeQueue")
     public void listenLikeQueue(LikeQueueEntity likeQueueEntity){
-        System.out.println("消费者1");
         handleLike(likeQueueEntity);
     }
 
 
-    @RabbitListener(queues = "direct.likeQueue")
-    public void listenLikeQueue2(LikeQueueEntity likeQueueEntity){
-        System.out.println("消费者2");
-        handleLike2(likeQueueEntity);
-    }
 
 
     @Async("threadPoolTaskExecutor")
     @Scheduled(cron ="0/10 * * * * ? ")
     public void updateLikeCountToDb(){  //每十秒聚合更新点赞数到db中，聚合成功后清楚对应记录
-        Iterator<Map.Entry<Long, Long>> iterator = recordUserLikeCounts.entrySet().iterator();
-        System.out.println("更新中，数据： " + recordUserLikeCounts.toString());
-        while (iterator.hasNext()){
-            System.out.println("有数据");
-            Map.Entry<Long, Long> item = iterator.next();  //1.
-            iterator.remove();
-            Long shareId = item.getKey();
-            Long count = item.getValue();
-            userAgreeShareDao.updateAgreeCount(shareId,count);
-//            recordUserLikeCounts.remove(shareId);
+        Iterator<LikeRecordEntity> likeRecordEntityIterator = recordLikeAllInfoCount.iterator();
+        HashMap<Long,Long> hashMap = new HashMap<>();
+        while (likeRecordEntityIterator.hasNext()){
+            LikeRecordEntity likeQueueEntity = likeRecordEntityIterator.next();
+            likeRecordEntityIterator.remove();
+            Integer behaviorType = BooleanUtil.toInteger(likeQueueEntity.getBehaviorType());
+            Long likeCountsOrDefault = 0L;
+            if(behaviorType == UserShareBehaviorISAddType.ADD_TYPE.getType()){
+                likeCountsOrDefault = 1L;
+            }else if(behaviorType == UserShareBehaviorISAddType.DELETE_TYPE.getType()){
+                likeCountsOrDefault = -1L;
+            }
+            Long shareId = likeQueueEntity.getShareId();
+            hashMap.put(shareId,hashMap.getOrDefault(shareId,0L) + likeCountsOrDefault);
         }
-    }
 
-    @Async("threadPoolTaskExecutor")
-    @Scheduled(cron ="0/10 * * * * ? ")
-    public void updateLikeCountToDb2(){  //每十秒聚合更新点赞数到db中，聚合成功后清楚对应记录
-        Iterator<Map.Entry<Long, Long>> iterator = recordUserLikeCounts2.entrySet().iterator();
-        System.out.println("更新中，数据： " + recordUserLikeCounts2.toString());
+        //更新点赞数值到DB
+        Iterator<Map.Entry<Long, Long>> iterator = hashMap.entrySet().iterator();
         while (iterator.hasNext()){
             Map.Entry<Long, Long> item = iterator.next();
             iterator.remove();
-            System.out.println("已经删除");
             Long shareId = item.getKey();
             Long count = item.getValue();
             userAgreeShareDao.updateAgreeCount(shareId,count);
+            //同步缓存
+            RedisUtils.hdel(Constants.getArticleCountHashKey(shareId),Constants.ARTICLE_COUNT_HASH_LIKE_CNT);
         }
+
     }
+
 
 }

@@ -8,7 +8,6 @@ import com.collect.backend.domain.vo.req.common.CursorPageBaseReq;
 import com.collect.backend.domain.vo.req.common.HomePageReq;
 import com.collect.backend.domain.vo.resp.FollowShareListVo;
 import com.collect.backend.domain.vo.resp.ShareVo;
-import com.collect.backend.domain.vo.resp.common.CommonBottomPageVo;
 import com.collect.backend.domain.vo.resp.common.CursorPageBaseResp;
 
 public interface ShareService {

@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.collect.backend.common.BaseResponse;
+import com.collect.backend.common.Constants;
 import com.collect.backend.common.ResultUtils;
 import com.collect.backend.common.enums.MessageNotifyTypeEnum;
 import com.collect.backend.common.enums.UserShareBehaviorISAddType;
@@ -122,7 +123,8 @@ public class ShareServiceImpl  implements ShareService {
             return CursorPageBaseResp.empty();
         }
         List<Share> records = cursorPageBaseResp.getList();
-        CursorPageBaseResp<ShareVo> init = CursorPageBaseResp.init(cursorPageBaseResp, shareAdpter.getShareVoList(records));
+        CursorPageBaseResp<ShareVo> init = CursorPageBaseResp.init(cursorPageBaseResp,
+                shareAdpter.getShareVoList(records));
         List<ShareVo> list = init.getList();
         for (ShareVo shareVo : list) {
             RedisUtils.zAddToStr(ARTICLE_LIST_KEY,shareVo,shareVo.getId());
@@ -132,15 +134,15 @@ public class ShareServiceImpl  implements ShareService {
     @Override
     public CursorPageBaseResp<ShareVo> listShare(CursorPageBaseReq cursorPageBaseReq) {
         String cursor = cursorPageBaseReq.getCursor();
-        return RedisCommonFunc.addCacheCommonFun(redissonClient, new Supplier<CursorPageBaseResp>() {
+        CursorPageBaseResp<ShareVo> cursorPageBaseResp = RedisCommonFunc.addCacheCommonFun(redissonClient, new Supplier<CursorPageBaseResp>() {
                     @Override
                     public CursorPageBaseResp get() {
                         return RedisCommonFunc.getCursorDataByRedis(
-                                cursorPageBaseReq,ARTICLE_LIST_KEY,ShareVo.class,ShareVo::getId
+                                cursorPageBaseReq, ARTICLE_LIST_KEY, ShareVo.class, ShareVo::getId
                         );
                     }
                 },
-                getShareListLockKey(cursor),new Supplier<CursorPageBaseResp>() {
+                getShareListLockKey(cursor), new Supplier<CursorPageBaseResp>() {
                     @Override
                     public CursorPageBaseResp<ShareVo> get() {
                         CursorPageBaseResp<ShareVo> cursorPageBaseResp = getCursorPageBaseResp(cursorPageBaseReq);
@@ -150,6 +152,12 @@ public class ShareServiceImpl  implements ShareService {
                         return cursorPageBaseResp;
                     }
                 });
+        List<ShareVo> respList = cursorPageBaseResp.getList();
+        Long userId = ManageUserInfo.getUser().getId();
+        for (ShareVo shareVo : respList) {
+            shareAdpter.getShareVo(shareVo,userId);
+        }
+        return cursorPageBaseResp;
     }
 
     @Override
@@ -166,8 +174,9 @@ public class ShareServiceImpl  implements ShareService {
     public BaseResponse<String> userBehavior(ShareUserBehaviorReq shareUserBehaviorReq) {
         AssertUtil.isNotEmpty(shareUserBehaviorReq,"参数为空");
         Long userId = ManageUserInfo.getUser().getId();
+        Long shareId = shareUserBehaviorReq.getId();
         UserShareBehavior userShareBehavior = new UserShareBehavior(null,userId,
-                UserShareBehaviorType.SHARE_AGREE.getType(),new Date(),shareUserBehaviorReq.getId()
+                UserShareBehaviorType.SHARE_AGREE.getType(),new Date(), shareId
                 );
         Integer type = shareUserBehaviorReq.getType();
         UserShareBehaviorType byType = UserShareBehaviorType.getByType(type);
@@ -182,7 +191,7 @@ public class ShareServiceImpl  implements ShareService {
                 break;
                 //收藏不走消息队列
             case SHARE_COLLECT:
-                Share share = shareDao.getBaseMapper().selectById(shareUserBehaviorReq.getId());
+                Share share = shareDao.getBaseMapper().selectById(shareId);
                 if(Objects.isNull(share)) throw new BusinessException("文章内容不存在");
                 messageNotify = new MessageNotify(null,
                         share.getUserId(),userId,null,share.getId(), false,new Date());
@@ -194,6 +203,7 @@ public class ShareServiceImpl  implements ShareService {
                     shareBehaviorDao.getBaseMapper().deleteById(
                             shareBehaviorDao.queryByUserIdAndTypeAndShareId(userId, shareUserBehaviorReq.getType(),share.getId()));
                 }
+                RedisUtils.hdel(Constants.getArticleCountHashKey(shareId), ARTICLE_COUNT_HASH_COLLECT_CNT);
                 messageNotify.setType(MessageNotifyTypeEnum.USER_COLLECT_ARTICLE.getType());
                 break;
         }
@@ -202,7 +212,6 @@ public class ShareServiceImpl  implements ShareService {
         && shareUserBehaviorReq.getType() == UserShareBehaviorType.SHARE_COLLECT.getType()){  //用户收藏帖子走内置event事件
             applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,messageNotify));
         }
-
         return  ResultUtils.success("ok");
     }
 
@@ -264,32 +273,35 @@ public class ShareServiceImpl  implements ShareService {
        return RandomUtil.randomLong(0, time - 4) + time - 5; //在time - 5 到 time 这个区间内
     }
     @Override
-    public ShareVo getDetailShare(Long id) {
-        AssertUtil.isNotEmpty(id,"编号不能为空");
+    public ShareVo getDetailShare(Long shareId) {
+        AssertUtil.isNotEmpty(shareId,"编号不能为空");
         Long userId = ManageUserInfo.getUser().getId();
         //更新阅读量
-        String readingKey = RedisUtils.getStr(shareReadingKey + id + ":userId:" + userId);
+        String readingKey = RedisUtils.getStr(shareReadingKey + shareId + ":userId:" + userId);
         if(StringUtils.isBlank(readingKey)){
-            shareAdpter.getReadCountDao().updateReadCount(id);
-            RedisUtils.set(shareReadingKey + id + ":userId:" + userId,1,READING_EXPIRIION, TimeUnit.DAYS);
+            shareAdpter.getReadCountDao().updateReadCount(shareId);
+            //同步缓存
+            RedisUtils.hdel(Constants.getArticleCountHashKey(shareId),Constants.ARTICLE_COUNT_HASH_READING_CNT);
+            RedisUtils.set(shareReadingKey + shareId + ":userId:" + userId,1,READING_EXPIRIION, TimeUnit.DAYS);
         }
-        return RedisCommonFunc.addCacheCommonFunForBloom
-                (redissonClient, getShareDetailsKey(id), getDetailsLockKey(id), ShareVo.class
-                , new Supplier<ShareVo>() {
-                    @Override
-                    public ShareVo get() {
-                        //走mysql
-                        Share share = shareDao.getById(id);
-                        if(Objects.isNull(share)){
-                            //缓存空对象解决
+        ShareVo shareVo = RedisCommonFunc.addCacheCommonFunForBloom
+                (redissonClient, getShareDetailsKey(shareId), getDetailsLockKey(shareId), ShareVo.class
+                        , new Supplier<ShareVo>() {
+                            @Override
+                            public ShareVo get() {
+                                //走mysql
+                                Share share = shareDao.getById(shareId);
+                                if (Objects.isNull(share)) {
+                                    //缓存空对象解决
 //                            stringRedisTemplate.opsForValue().set(getShareDetailsKey(id),"", ARTICLE_NULL_TIME,TimeUnit.MINUTES);
-                            throw new BusinessException("分享页面不存在");
-                        }
-                        ShareVo shareVo = shareAdpter.getShareVo(share, userId);
-                        RedisUtils.set(getShareDetailsKey(id),shareVo,getRandomTimeMin(DETAILS_SHARE_TIME),TimeUnit.MINUTES);  //设置缓存
-                        return shareVo;
-                    }
-                },id);
+                                    throw new BusinessException("分享页面不存在");
+                                }
+                                ShareVo shareVoUserInfo = shareAdpter.getShareVoUserInfo(share);
+                                RedisUtils.set(getShareDetailsKey(shareId), share, getRandomTimeMin(DETAILS_SHARE_TIME), TimeUnit.MINUTES);  //设置缓存
+                                return shareVoUserInfo;
+                            }
+                        }, shareId);
+        return shareAdpter.getShareVo(shareVo, userId);
     }
 
     @Override

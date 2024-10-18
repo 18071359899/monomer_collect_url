@@ -26,6 +26,7 @@ public class PreviewFileController {
     @Value("${myfile.path}")
     private String prefix;
     public ResponseEntity<byte[]> getFileReader(String filePath,String contentType,String suffixName){
+        //todo 使用minio获取文件的input并返回
         try {
             File file = new File(prefix + filePath);
             if (file.exists()) {

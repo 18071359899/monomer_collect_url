@@ -42,25 +42,16 @@ public class RedisCommonFunc {
         if(Objects.nonNull(redisData)){  //走redis
             return redisData;
         }
-        RLock lock = redissonClient.getLock(redisLockKey);
-        try {
-            lock.lock();
-        } catch (Throwable e) {
-            log.error("获取分布式锁出问题",e);
-            throw new BusinessException("获取数据失败");
-        }
-        try {
-            redisData = getRedisDataSupplier.get();
-            if(Objects.nonNull(redisData)){  //走redis
-                return redisData;
+        return addCacheLock(redissonClient, redisLockKey, new Supplier<T>() {
+            @Override
+            public T get() {
+                T redisData = getRedisDataSupplier.get();
+                if(Objects.nonNull(redisData)){  //走redis
+                    return redisData;
+                }
+                return supplier.get();
             }
-            return supplier.get();
-        }finally {
-            // 只能释放自己的锁
-            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
+        });
     }
 
     /**
@@ -117,26 +108,59 @@ public class RedisCommonFunc {
         }
         //缓存空对象解决缓存穿透
         AssertUtil.isEmpty(redisData,"页面不存在");
-        RLock lock = redissonClient.getLock(redisLockKey);
-        try {
-            lock.lock();
-        } catch (Throwable e) {
-            log.error("获取分布式锁出问题",e);
-            throw new BusinessException("获取数据失败");
-        }
-        try {
-            redisData = RedisUtils.get(redisKey);
-            if(StrUtil.isNotBlank(redisData)){  //走redis
-                return JsonUtils.toObj(redisData,clazz);
+        return addCacheLock(redissonClient, redisLockKey, new Supplier<T>() {
+            @Override
+            public T get() {
+                String redisData = RedisUtils.get(redisKey);
+                if(StrUtil.isNotBlank(redisData)){  //走redis
+                    return JsonUtils.toObj(redisData,clazz);
+                }
+                return supplier.get();
             }
-            return supplier.get();
-        }finally {
-            // 只能释放自己的锁
-            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
-                lock.unlock();
-            }
-        }
+        });
     }
+
+//    /**
+//     * 添加hash缓存通用封装方法，解决 缓存穿透、缓存击穿* @param redisKey
+//     * 使用空对象
+//     * @param redissonClient
+//     * @param redisKey
+//     * @param redisLockKey
+//     * @param clazz
+//     * @param supplier
+//     * @return
+//     * @param <T>
+//     */
+//    public static  <T> T addCacheCommonFunHash(RedissonClient redissonClient,
+//                                           String redisKey,
+//                                           String redisLockKey,
+//                                           Class<T> clazz, Supplier<T> supplier){
+//        String redisData = RedisUtils.get(redisKey);
+//        if(StrUtil.isNotBlank(redisData)){  //走redis
+//            return JsonUtils.toObj(redisData,clazz);
+//        }
+//        //缓存空对象解决缓存穿透
+//        AssertUtil.isEmpty(redisData,"页面不存在");
+//        RLock lock = redissonClient.getLock(redisLockKey);
+//        try {
+//            lock.lock();
+//        } catch (Throwable e) {
+//            log.error("获取分布式锁出问题",e);
+//            throw new BusinessException("获取数据失败");
+//        }
+//        try {
+//            redisData = RedisUtils.get(redisKey);
+//            if(StrUtil.isNotBlank(redisData)){  //走redis
+//                return JsonUtils.toObj(redisData,clazz);
+//            }
+//            return supplier.get();
+//        }finally {
+//            // 只能释放自己的锁
+//            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
+//                lock.unlock();
+//            }
+//        }
+//    }
 
     /**
      * 添加缓存通用封装方法，解决 缓存穿透、缓存击穿* @param redisKey
@@ -162,6 +186,28 @@ public class RedisCommonFunc {
         //布隆过滤器解决缓存穿透
         RBloomFilter<Long> bloomFilter = redissonClient.getBloomFilter(ARTICLE_DETAILS_BL_KEY);
         AssertUtil.isTrue(bloomFilter.contains(businessId),"页面不存在");
+        return addCacheLock(redissonClient, redisLockKey, new Supplier<T>() {
+            @Override
+            public T get() {
+                String redisData = RedisUtils.get(redisKey);
+                if(StrUtil.isNotBlank(redisData)){  //走redis
+                return JsonUtils.toObj(redisData,clazz);
+                }
+                return supplier.get();
+            }
+        });
+    }
+
+    /**
+     * 封装分布式锁，一些情况下最好自己写
+     * @param redissonClient
+     * @param redisLockKey
+     * @param supplier
+     * @return
+     * @param <T>
+     */
+    public static <T> T addCacheLock(RedissonClient redissonClient,String redisLockKey,
+                                     Supplier<T> supplier){
         RLock lock = redissonClient.getLock(redisLockKey);
         try {
             lock.lock();
@@ -170,10 +216,6 @@ public class RedisCommonFunc {
             throw new BusinessException("获取数据失败");
         }
         try {
-            redisData = RedisUtils.get(redisKey);
-            if(StrUtil.isNotBlank(redisData)){  //走redis
-                return JsonUtils.toObj(redisData,clazz);
-            }
             return supplier.get();
         }finally {
             // 只能释放自己的锁

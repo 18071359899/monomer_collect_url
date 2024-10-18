@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.collect.backend.common.BaseResponse;
+import com.collect.backend.common.Constants;
 import com.collect.backend.common.ResultUtils;
 import com.collect.backend.common.enums.MessageNotifyTypeEnum;
 import com.collect.backend.common.event.MessageNotifyEvent;
@@ -21,6 +22,7 @@ import com.collect.backend.domain.vo.resp.common.CommonBottomPageVo;
 import com.collect.backend.service.share.CommentService;
 import com.collect.backend.utils.assertBussion.AssertUtil;
 import com.collect.backend.utils.ManageUserInfo;
+import com.collect.backend.utils.redis.RedisUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -58,6 +60,7 @@ public class CommentServiceImpl implements CommentService {
             applicationEventPublisher.publishEvent(new MessageNotifyEvent(this,new MessageNotify(
                     null,share.getUserId(),comment.getUserId(), MessageNotifyTypeEnum.USER_COMMENT_ARTICLE.getType(),comment.getId(),false,new Date())
             ));
+            RedisUtils.hdel(Constants.getArticleCountHashKey(comment.getShareId()),Constants.ARTICLE_COUNT_HASH_COMMENT_CNT);
             return ResultUtils.success(comment.getId());
         }
         return ResultUtils.error(OPERATION_ERROR);
@@ -87,6 +90,7 @@ public class CommentServiceImpl implements CommentService {
                 }
             }
         }
+        RedisUtils.hdel(Constants.getArticleCountHashKey(comment.getShareId()),Constants.ARTICLE_COUNT_HASH_COMMENT_CNT);
     }
 
     @Override

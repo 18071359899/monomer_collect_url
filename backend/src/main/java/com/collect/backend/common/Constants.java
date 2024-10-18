@@ -1,6 +1,8 @@
 package com.collect.backend.common;
 
 
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+
 /**
  * 通用常量信息
  * 
@@ -72,6 +74,39 @@ public class Constants{
      * hash数据结构 用户网盘总空间 key
      */
     public static  final  String UPLOAD_FILE_TOTAL_KEY = "userTotal";
+
+    /**
+     * 文章相关计数hash结构 key
+     * @param userId
+     * @return
+     */
+    public static  final  String ARTICLE_COUNT_HASH_KEY = "articleCount:";
+    /**
+     * 文章相关计数hash结构lock锁 key
+     */
+    public static  final  String ARTICLE_COUNT_HASH_LOCK_KEY = "articleLockCount:";
+    /**
+     * 阅读量
+     */
+    public static  final  String ARTICLE_COUNT_HASH_READING_CNT = "readingCnt:";
+    /**
+     * 点赞数
+     */
+    public static  final  String ARTICLE_COUNT_HASH_LIKE_CNT = "likeCnt:";
+    /**
+     * 评论数
+     */
+    public static  final  String ARTICLE_COUNT_HASH_COMMENT_CNT = "commentCnt:";
+    /**
+     * 收藏数
+     */
+    public static  final  String ARTICLE_COUNT_HASH_COLLECT_CNT = "collectCnt:";
+    public static String getArticleCountHashLockKey(Long shareId){
+        return ARTICLE_COUNT_HASH_LOCK_KEY + shareId;
+    }
+    public static String getArticleCountHashKey(Long shareId){
+        return ARTICLE_COUNT_HASH_KEY + shareId;
+    }
 
     public static String getUserUseFileKey(Long userId){
         return UPLOAD_FILE_COMPUTED_KEY + userId;
